@@ -70,6 +70,8 @@ export const dictionaries = {
     requiredFields: "Заполните обязательные поля",
     notFound: "Группа не найдена",
     youAreAdmin: "Вы администратор",
+    addMember: "Добавить участника",
+    newMemberName: "Имя нового участника",
   },
   pl: {
     appName: "Budżet Rodzinny",
@@ -133,6 +135,8 @@ export const dictionaries = {
     requiredFields: "Wypełnij wymagane pola",
     notFound: "Nie znaleziono grupy",
     youAreAdmin: "Jesteś administratorem",
+    addMember: "Dodaj uczestnika",
+    newMemberName: "Imię nowego uczestnika",
   },
   en: {
     appName: "Family Budget",
@@ -196,6 +200,8 @@ export const dictionaries = {
     requiredFields: "Fill in required fields",
     notFound: "Group not found",
     youAreAdmin: "You are admin",
+    addMember: "Add member",
+    newMemberName: "New member name",
   },
 } as const;
 
