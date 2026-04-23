@@ -84,7 +84,7 @@ export const MembersPanel = () => {
                   <Input
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    placeholder={t("yourName")}
+                    placeholder={t("newMemberName")}
                     className="rounded-2xl h-11"
                   />
                 </div>

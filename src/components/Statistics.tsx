@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { DEFAULT_CATEGORIES, Transaction } from "@/lib/types";
+import { DEFAULT_CATEGORIES, Transaction, TRANSFER_CATEGORY } from "@/lib/types";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 function getCategoryMeta(catKey: string, t: (k: any) => string) {
   if (catKey.startsWith("custom:")) {
@@ -17,9 +18,12 @@ function getCategoryMeta(catKey: string, t: (k: any) => string) {
   };
 }
 
+type StatsView = "expenses" | "incomes";
+
 export const Statistics = () => {
   const { t, group, formatMoney, lang } = useApp();
   const [monthOffset, setMonthOffset] = useState(0);
+  const [view, setView] = useState<StatsView>("expenses");
 
   const ref = useMemo(() => {
     const d = new Date();
@@ -33,7 +37,8 @@ export const Statistics = () => {
     { month: "long", year: "numeric" }
   ).format(ref);
 
-  const { incomes, expenses, byCat, txs } = useMemo(() => {
+  // Monthly aggregates
+  const { incomes, expenses, byCat, txs, transfersByRecipient } = useMemo(() => {
     const all = group?.transactions ?? [];
     const filtered = all.filter((tx) => {
       const d = new Date(tx.date);
@@ -41,25 +46,67 @@ export const Statistics = () => {
     });
     let inc = 0, exp = 0;
     const cats: Record<string, number> = {};
+    const recipients: Record<string, number> = {};
     for (const tx of filtered) {
-      if (tx.type === "income") inc += tx.amount;
-      else if (tx.type === "expense") {
+      if (tx.type === "income") {
+        inc += tx.amount;
+      } else if (tx.type === "expense") {
         exp += tx.amount;
         cats[tx.category] = (cats[tx.category] || 0) + tx.amount;
+        if (tx.category === TRANSFER_CATEGORY && tx.recipient) {
+          recipients[tx.recipient] = (recipients[tx.recipient] || 0) + tx.amount;
+        }
       }
     }
-    return { incomes: inc, expenses: exp, byCat: cats, txs: filtered };
+    return {
+      incomes: inc,
+      expenses: exp,
+      byCat: cats,
+      txs: filtered,
+      transfersByRecipient: Object.entries(recipients).sort((a, b) => b[1] - a[1]),
+    };
   }, [group, ref]);
 
-  const pieData = Object.entries(byCat).map(([cat, value]) => {
-    const meta = getCategoryMeta(cat, t);
-    return { name: `${meta.emoji} ${meta.label}`, value, color: meta.color };
-  });
+  // Total treasury (all-time)
+  const treasury = useMemo(() => {
+    const all = group?.transactions ?? [];
+    let bal = 0;
+    for (const tx of all) {
+      if (tx.type === "income") bal += tx.amount;
+      else if (tx.type === "expense") bal -= tx.amount;
+    }
+    return bal;
+  }, [group]);
 
-  const balance = incomes - expenses;
+  const totalForView = view === "expenses" ? expenses : incomes;
+
+  const pieData = useMemo(() => {
+    if (view === "expenses") {
+      return Object.entries(byCat).map(([cat, value]) => {
+        const meta = getCategoryMeta(cat, t);
+        return { name: `${meta.emoji} ${meta.label}`, value, color: meta.color };
+      });
+    }
+    // incomes — single bucket
+    if (incomes <= 0) return [];
+    return [{ name: `💰 ${t("incomes")}`, value: incomes, color: "hsl(var(--mint))" }];
+  }, [view, byCat, incomes, t]);
 
   return (
     <div className="space-y-4">
+      {/* Treasury */}
+      <div className="glass rounded-3xl p-5 shadow-card">
+        <div className="text-xs font-semibold text-muted-foreground mb-1">{t("treasury")}</div>
+        <div
+          className={cn(
+            "font-display font-bold text-3xl transition-colors",
+            treasury < 0 ? "text-destructive" : "text-foreground"
+          )}
+        >
+          {formatMoney(treasury)}
+        </div>
+      </div>
+
       {/* Month switcher */}
       <div className="flex items-center justify-between glass rounded-2xl p-3 shadow-card">
         <button
@@ -78,25 +125,42 @@ export const Statistics = () => {
         </button>
       </div>
 
-      {/* Totals */}
-      <div className="grid grid-cols-3 gap-3">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-mint rounded-3xl p-4 shadow-card">
+      {/* Clickable totals */}
+      <div className="grid grid-cols-2 gap-3">
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setView("incomes")}
+          className={cn(
+            "bg-gradient-mint rounded-3xl p-4 shadow-card text-left transition-all",
+            view === "incomes" ? "ring-2 ring-primary scale-[1.02]" : "opacity-80 hover:opacity-100"
+          )}
+        >
           <div className="text-xs font-semibold text-primary-foreground/70 mb-1">{t("totalIncome")}</div>
           <div className="font-display font-bold text-lg text-primary-foreground truncate">{formatMoney(incomes)}</div>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-gradient-peach rounded-3xl p-4 shadow-card">
+        </motion.button>
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setView("expenses")}
+          className={cn(
+            "bg-gradient-peach rounded-3xl p-4 shadow-card text-left transition-all",
+            view === "expenses" ? "ring-2 ring-primary scale-[1.02]" : "opacity-80 hover:opacity-100"
+          )}
+        >
           <div className="text-xs font-semibold text-accent-foreground/70 mb-1">{t("totalExpense")}</div>
           <div className="font-display font-bold text-lg text-accent-foreground truncate">{formatMoney(expenses)}</div>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-gradient-lavender rounded-3xl p-4 shadow-card">
-          <div className="text-xs font-semibold text-secondary-foreground/70 mb-1">{t("balance")}</div>
-          <div className="font-display font-bold text-lg text-secondary-foreground truncate">{formatMoney(balance)}</div>
-        </motion.div>
+        </motion.button>
       </div>
 
       {/* Pie */}
       <div className="glass rounded-3xl p-5 shadow-card">
-        <h3 className="font-display font-bold mb-3">{t("byCategory")}</h3>
+        <h3 className="font-display font-bold mb-3">
+          {view === "expenses" ? t("expenses") : t("incomes")} · {t("byCategory")}
+        </h3>
         {pieData.length === 0 ? (
           <div className="text-center text-muted-foreground py-12 text-sm">
             {t("noTransactions")}
@@ -126,27 +190,55 @@ export const Statistics = () => {
                       background: "hsl(var(--card))",
                       boxShadow: "0 8px 24px -8px hsl(250 40% 60% / 0.2)",
                     }}
-                    formatter={(v: number) => formatMoney(v)}
+                    formatter={(v: number, name) => {
+                      const pct = totalForView > 0 ? ((v / totalForView) * 100).toFixed(1) : "0";
+                      return [`${formatMoney(v)} · ${pct}% ${t("percentOfTotal")}`, name as string];
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div className="w-full sm:w-1/2 space-y-2">
               {pieData
+                .slice()
                 .sort((a, b) => b.value - a.value)
-                .map((d) => (
-                  <div key={d.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full" style={{ background: d.color }} />
-                      <span className="truncate">{d.name}</span>
+                .map((d) => {
+                  const pct = totalForView > 0 ? ((d.value / totalForView) * 100).toFixed(1) : "0";
+                  return (
+                    <div key={d.name} className="flex items-center justify-between text-sm gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="h-3 w-3 rounded-full shrink-0" style={{ background: d.color }} />
+                        <span className="truncate">{d.name}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-semibold">{formatMoney(d.value)}</div>
+                        <div className="text-[10px] text-muted-foreground">{pct}%</div>
+                      </div>
                     </div>
-                    <span className="font-semibold">{formatMoney(d.value)}</span>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
         )}
       </div>
+
+      {/* Transfers by recipient (only in expense view) */}
+      {view === "expenses" && transfersByRecipient.length > 0 && (
+        <div className="glass rounded-3xl p-5 shadow-card">
+          <h3 className="font-display font-bold mb-3">💸 {t("transfersTo")}</h3>
+          <div className="space-y-2">
+            {transfersByRecipient.map(([name, sum]) => (
+              <div
+                key={name}
+                className="flex items-center justify-between p-3 rounded-2xl bg-muted/40"
+              >
+                <span className="font-semibold truncate">{name}</span>
+                <span className="font-display font-bold text-rose-700">{formatMoney(sum)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tx list */}
       <div className="glass rounded-3xl p-5 shadow-card">
@@ -168,11 +260,11 @@ const TxRow = ({ tx }: { tx: Transaction }) => {
   const member = group?.members.find((m) => m.id === tx.memberId);
   const meta = getCategoryMeta(tx.category, t);
   const canEdit = isAdmin || tx.memberId === me?.id;
-  const sign = tx.type === "income" ? "+" : tx.type === "expense" ? "−" : "↔";
-  const colorClass =
-    tx.type === "income" ? "text-emerald-700" :
-    tx.type === "expense" ? "text-rose-700" :
-    "text-sky-700";
+  const sign = tx.type === "income" ? "+" : "−";
+  const colorClass = tx.type === "income" ? "text-emerald-700" : "text-rose-700";
+  const subtitle = tx.category === TRANSFER_CATEGORY && tx.recipient
+    ? `→ ${tx.recipient}`
+    : tx.comment;
 
   return (
     <motion.div
@@ -189,7 +281,7 @@ const TxRow = ({ tx }: { tx: Transaction }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 text-sm">
           <span className="font-semibold truncate">{meta.label}</span>
-          {tx.comment && <span className="text-muted-foreground truncate">· {tx.comment}</span>}
+          {subtitle && <span className="text-muted-foreground truncate">· {subtitle}</span>}
         </div>
         <div className="text-xs text-muted-foreground flex items-center gap-1.5">
           <span>{member?.emoji} {member?.name}</span>
