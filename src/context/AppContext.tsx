@@ -27,6 +27,7 @@ interface AppContextValue {
   deleteTransaction: (id: string) => void;
 
   promoteMember: (memberId: string) => void;
+  addMember: (name: string, emoji: string) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -163,12 +164,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const addMember: AppContextValue["addMember"] = (name, emoji) => {
+    if (!group || !isAdmin) return;
+    const newMember: Member = {
+      id: uid(),
+      name: name.trim() || "Member",
+      emoji,
+      role: "member",
+    };
+    persistGroup({ ...group, members: [...group.members, newMember] });
+  };
+
   const value: AppContextValue = {
     lang, currency, setLang, setCurrency, t, formatMoney, formatDate, currencySymbol,
     session, group, me, isAdmin,
     createGroup, joinGroup, leaveSession,
     addTransaction, updateTransaction, deleteTransaction,
-    promoteMember,
+    promoteMember, addMember,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
