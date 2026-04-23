@@ -4,6 +4,7 @@ import { Statistics } from "./Statistics";
 import { MembersPanel } from "./MembersPanel";
 import { AddTransactionDialog } from "./AddTransactionDialog";
 import { LangCurrencySwitcher } from "./LangCurrencySwitcher";
+import { MemberSwitcher } from "./MemberSwitcher";
 import { Plus, BarChart3, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,13 +22,13 @@ export const Dashboard = () => {
     <div className="min-h-screen pb-32">
       <div className="max-w-2xl mx-auto px-4 pt-6">
         {/* Header */}
-        <header className="flex items-center justify-between mb-6">
+        <header className="flex items-center justify-between mb-4 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-mint flex items-center justify-center text-2xl shadow-card">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-mint flex items-center justify-center text-2xl shadow-card shrink-0">
               {me.emoji}
             </div>
             <div className="min-w-0">
-              <div className="text-xs text-muted-foreground">{group.name}</div>
+              <div className="text-xs text-muted-foreground truncate">{group.name}</div>
               <div className="font-display font-bold text-lg truncate">
                 {t("welcome")}, {me.name}!
               </div>
@@ -35,6 +36,11 @@ export const Dashboard = () => {
           </div>
           <LangCurrencySwitcher />
         </header>
+
+        {/* Active member switcher */}
+        <div className="mb-5">
+          <MemberSwitcher />
+        </div>
 
         {/* Tabs */}
         <div className="grid grid-cols-2 gap-2 p-1 bg-muted/50 rounded-2xl mb-5">
