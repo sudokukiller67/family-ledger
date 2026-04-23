@@ -100,7 +100,7 @@ export const Statistics = () => {
         <div
           className={cn(
             "font-display font-bold text-3xl transition-colors",
-            treasury < 0 ? "text-red-500" : "text-foreground"
+            treasury < 0 ? "text-destructive" : "text-foreground"
           )}
         >
           {formatMoney(treasury)}
